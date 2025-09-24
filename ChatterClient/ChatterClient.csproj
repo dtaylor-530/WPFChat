@@ -8,11 +8,12 @@
     <OutputType>WinExe</OutputType>
     <RootNamespace>ChatterClient</RootNamespace>
     <AssemblyName>ChatterClient</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -63,11 +64,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="AsyncCommand.cs" />
-    <Compile Include="Converters\BooleanToVisibilityConverter.cs" />
-    <Compile Include="ChatroomViewModel.cs" />
-    <Compile Include="Converters\InverseBooleanConverter.cs" />
-    <Compile Include="MainWindowViewModel.cs" />
+    <Compile Include="ViewModels\ChatroomViewModel.cs" />
+    <Compile Include="ViewModels\MainWindowViewModel.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -82,7 +80,6 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BaseViewModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -110,6 +107,14 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Chatter.WPF.Library\Chatter.WPF.Library.csproj">
+      <Project>{0bd154dd-2ee1-4e0b-941f-57a327b1c1bb}</Project>
+      <Name>Chatter.WPF.Library</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ChatterServer\ChatterServer.csproj">
+      <Project>{618B56D0-F427-4957-8835-9462C2C8A811}</Project>
+      <Name>ChatterServer</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SimplePackets\SimplePackets.csproj">
       <Project>{02099d3b-edf4-4d4b-a70e-b381aba41cab}</Project>
       <Name>SimplePackets</Name>

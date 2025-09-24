@@ -7,7 +7,7 @@ using System.Windows.Input;
 
 namespace ChatterClient
 {
-    internal class AsyncCommand : ICommand
+    public class AsyncCommand : ICommand
     {
         private readonly Func<Task> _execute;
         private readonly Func<bool> _canExecute;
@@ -15,6 +15,11 @@ namespace ChatterClient
 
         public AsyncCommand(Func<Task> execute) : this(execute, () => true)
         {
+        }
+        public AsyncCommand(Action execute) 
+        {
+            _execute = () => { execute(); return Task.CompletedTask; };
+            _canExecute = () => true;
         }
 
         public AsyncCommand(Func<Task> execute, Func<bool> canExecute)

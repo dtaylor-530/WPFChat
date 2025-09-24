@@ -184,7 +184,8 @@ namespace ChatterClient
         private async Task<bool> MonitorData()
         {
             var newObject = await _client.RecieveObject();
-
+            if (newObject == null)
+                return false;
             App.Current.Dispatcher.Invoke(delegate
             {
                 return ManagePacket(newObject);
@@ -205,6 +206,7 @@ namespace ChatterClient
                 if (packet is UserConnectionPacket connectionP)
                 {
                     Users.Clear();
+                    if(connectionP.Users != null)
                     foreach (var user in connectionP.Users)
                     {
                         Users.Add(user);
