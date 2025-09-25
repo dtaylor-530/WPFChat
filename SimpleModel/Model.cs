@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
 
 namespace ChatterServer.Services
 {
@@ -20,22 +16,21 @@ namespace ChatterServer.Services
             current = SynchronizationContext.Current;
         }
 
-        public void AddChange(IChange change)
+        public void AddChange<T>(T change) where T : IChange
         {
-            if (Changes.Any(a => a.Equals(change)))
-            {
-                return;
-            }
-
             current.Post(_ =>
             {
+                if (Changes.OfType<T>().LastOrDefault()?.Equals(change) == true)
+                {
+                    return;
+                }
                 Changes.Add(change);
             }, null);
         }
 
-        public string String<T>() where T : IStringChange => Changes.OfType<T>().LastOrDefault().Value;
-        public int Int<T>() where T : IIntChange => Changes.OfType<T>().LastOrDefault().Value;
-        public bool Bool<T>() where T : IBooleanChange => Changes.OfType<T>().LastOrDefault().Value;
+        public string String<T>() where T : IStringChange => Changes.ToArray().OfType<T>().LastOrDefault().Value;
+        public int Int<T>() where T : IIntChange => Changes.ToArray().OfType<T>().LastOrDefault().Value;
+        public bool Bool<T>() where T : IBooleanChange => Changes.ToArray().OfType<T>().LastOrDefault().Value;
 
         public Dictionary<string, string> Dictionary<T>()
         {

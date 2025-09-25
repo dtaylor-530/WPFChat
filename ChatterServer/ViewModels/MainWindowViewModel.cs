@@ -18,7 +18,7 @@ namespace ChatterServer
         public string Port
         {
             get => Model.Instance.String<PortChange>();
-            set => Model.Instance.AddChange(new ExternalAddressChange(value));
+            set => Model.Instance.AddChange(new PortChange(value));
         }
 
         public string Status
@@ -33,9 +33,7 @@ namespace ChatterServer
             set => Model.Instance.AddChange(new ClientsConnectedChange(value));
         }
 
-        public ObservableCollection<string> Outputs { get; set; }
-
-        public Dictionary<string, string> Usernames = new();
+        public ObservableCollection<string> Outputs { get; } = new();
 
         public ICommand RunCommand { get; set; }
         public ICommand StopCommand { get; set; }
@@ -43,7 +41,6 @@ namespace ChatterServer
 
         public MainWindowViewModel()
         {
-            Outputs = new ObservableCollection<string>();
             RunCommand = new AsyncCommand(() => Model.Instance.AddChange(new RunChange()));
             StopCommand = new AsyncCommand(() => Model.Instance.AddChange(new StopChange()));
 

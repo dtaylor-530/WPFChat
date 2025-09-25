@@ -19,17 +19,19 @@ namespace SimpleTcp
         public string GuidId { get; set; }
     }
 
-    public class PacketEvents : EventArgs
+    public class PacketEvent : EventArgs
     {
-        public SimpleClient Sender;
-        public SimpleClient Receiver;
+        public object Sender;
+        public object Receiver;
         public object Packet;
+
+        public string Name { get; internal set; }
     }
 
     public class PersonalPacketEvents : EventArgs
     {
-        public SimpleClient Sender;
-        public SimpleClient Receiver;
+        public object Sender;
+        public object Receiver;
         public PersonalPacket Packet;
     }
 }

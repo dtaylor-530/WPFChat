@@ -9,7 +9,7 @@ namespace ChatterServer.Services
     public interface IChange
     {
 
-        public DateTime TimeStamp { get; }
+        //public DateTime TimeStamp { get; }
     }
 
     public interface IDictionaryAddChange : IChange
@@ -37,48 +37,48 @@ namespace ChatterServer.Services
 
     public readonly record struct OutputChange(string Value) : IStringChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
     public readonly record struct UserNameAddChange(string Key, string Value) : IDictionaryAddChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+       // public DateTime TimeStamp { get; } = DateTime.Now;
     }
     public readonly record struct UserNameRemoveChange(string Key, string Value) : IDictionaryAddChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
 
     public readonly record struct StatusChange(string Value) : IStringChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
     public readonly record struct IsRunningChange(bool Value) : IBooleanChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
     public readonly record struct ExternalAddressChange(string Value) : IStringChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
 
 
     public readonly record struct PortChange(string Value) : IStringChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+       // public DateTime TimeStamp { get; } = DateTime.Now;
     }
 
     public readonly record struct ClientsConnectedChange(int Value) : IIntChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
 
     public readonly record struct RunChange() : IChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
 
     public readonly record struct StopChange() : IChange
     {
-        public DateTime TimeStamp => DateTime.Now;
+        //public DateTime TimeStamp { get; } = DateTime.Now;
     }
 }

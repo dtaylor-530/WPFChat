@@ -1,39 +1,23 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace SimpleTcp
 {
-    public delegate void PacketEventHandler(object sender, PacketEvents e);
-    public delegate void PersonalPacketEventHandler(object sender, PersonalPacketEvents e);
-
     public class SimpleServer
     {
-        public IPAddress Address { get; private set; }
-        public int Port { get; private set; }
-
-        public IPEndPoint EndPoint { get; private set; }
-        public Socket Socket { get; private set; }
-
-        public bool IsRunning { get; private set; }
-        public List<SimpleClient> Connections { get; private set; }
-
         private Task _receivingTask;
 
-        public event PacketEventHandler OnConnectionAccepted;
-        public event PacketEventHandler OnConnectionRemoved;
-        public event PacketEventHandler OnPacketReceived;
-        public event PacketEventHandler OnPacketSent;
-
-        public event PersonalPacketEventHandler OnPersonalPacketSent;
-        public event PersonalPacketEventHandler OnPersonalPacketReceived;
+        public const string OnConnectionAccepted = nameof(OnConnectionAccepted);
+        public const string OnConnectionRejected = nameof(OnConnectionRejected);
+        public const string OnConnectionRemoved = nameof(OnConnectionRemoved);
+        public const string OnPacketReceived = nameof(OnPacketReceived);
+        public const string OnPersonalPacketReceived = nameof(OnPersonalPacketReceived);
+        public const string OnPersonalPacketSent = nameof(OnPersonalPacketSent);
+        public const string OnPacketSent = nameof(OnPacketSent);
 
         public SimpleServer(IPAddress address, int port)
         {
@@ -42,12 +26,19 @@ namespace SimpleTcp
 
             EndPoint = new IPEndPoint(address, port);
 
-            Socket = new Socket(AddressFamily.InterNetwork,
-                           SocketType.Stream, ProtocolType.Tcp);
-
-            Socket.ReceiveTimeout = 5000;
-            Connections = new List<SimpleClient>();
+            Socket = new (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+            {
+                ReceiveTimeout = 5000
+            };
         }
+
+        public IPAddress Address { get; }
+        public int Port { get; }
+        public IPEndPoint EndPoint { get; }
+        public Socket Socket { get; }
+        public bool IsRunning { get; set; }
+        public ObservableCollection<SimpleClient> Connections { get; } = [];
+        public ObservableCollection<PacketEvent> PacketEvents { get; } = [];
 
         public bool Open()
         {
@@ -82,12 +73,20 @@ namespace SimpleTcp
                     var newConnection = Socket.Accept();
                     if (newConnection != null)
                     {
-                        var client = new SimpleClient();
-                        var newGuid = await client.CreateGuid(newConnection);
-                        await client.SendMessage(newGuid);
+                        Guid newGuid = Guid.NewGuid();
+                        var client = new SimpleClient
+                        {
+                            Socket = newConnection,
+                            EndPoint = ((IPEndPoint)newConnection.LocalEndPoint),
+                            ClientId = newGuid
+                        };
+                        await newConnection.SendMessage(newGuid.ToString());
                         Connections.Add(client);
-                        var e = BuildEvent(client, null, String.Empty);
-                        OnConnectionAccepted?.Invoke(this, e);
+                        addEvent(OnConnectionAccepted, client, null, String.Empty);
+                    }
+                    else
+                    {
+                        addEvent(OnConnectionRejected, null, null, String.Empty);
                     }
                 }
             }
@@ -98,48 +97,43 @@ namespace SimpleTcp
         {
             while (IsRunning)
             {
-                foreach(var client in Connections.ToList())
+                foreach(var client in Connections.ToArray())
                 {
-                    if (!client.IsSocketConnected())
+                    if (!client.Socket.IsConnected())
                     {
-                        var e5 = BuildEvent(client, null, String.Empty);
                         Connections.Remove(client);
-                        OnConnectionRemoved?.Invoke(this, e5);
+                        addEvent(OnConnectionRemoved, client, null, string.Empty);                       
                         continue;
                     }
 
                     if(client.Socket.Available != 0)
                     {
-                        var readObject = ReadObject(client.Socket);
-                        var e1 = BuildEvent(client, null, readObject);
-                        OnPacketReceived?.Invoke(this, e1);
+                        var readObject = Helper.TryReceiveObject(client.Socket);
+                        addEvent(OnPacketReceived, client, null, readObject);
 
                         if(readObject is PingPacket ping)
                         {
-                            client.SendObject(ping).Wait();
+                            client.Socket.SendObject(ping).Wait();
                             continue;
                         }
 
                         if(readObject is PersonalPacket pp)
                         {
                             var destination = Connections.FirstOrDefault(c => c.ClientId.ToString() == pp.GuidId);
-                            var e4 = BuildEvent(client, destination, pp);
-                            OnPersonalPacketReceived?.Invoke(this, e4);
+                            addEvent(OnPersonalPacketReceived, client, destination, pp);
 
                             if(destination != null)
                             {
-                                destination.SendObject(pp).Wait();
-                                var e2 = BuildEvent(client, destination, pp);
-                                OnPersonalPacketSent?.Invoke(this, e2);
+                                destination.Socket.SendObject(pp).Wait();
+                               addEvent(OnPersonalPacketSent, client, destination, pp);
                             }
                         }
                         else
                         {
                             foreach (var c in Connections.ToList())
                             {
-                                c.SendObject(readObject).Wait();
-                                var e3 = BuildEvent(client, c, readObject);
-                                OnPacketSent?.Invoke(this, e3);
+                                c.Socket.SendObject(readObject).Wait();
+                               addEvent(OnPacketSent, client, c, readObject);
                             }
                         }
                     }
@@ -151,47 +145,21 @@ namespace SimpleTcp
         {
             foreach (var c in Connections.ToList())
             {
-                c.SendObject(package).Wait();
-                var e3 = BuildEvent(c, c, package);
-                OnPacketSent?.Invoke(this, e3);
+                c.Socket.SendObject(package).Wait();
+                addEvent(OnPacketSent, c, c, package);
             }
         }
 
-        private object ReadObject(Socket clientSocket)
+        private void addEvent(string name, SimpleClient sender, SimpleClient receiver, object package)
         {
-            byte[] data = new byte[clientSocket.ReceiveBufferSize];
-
-            using (Stream s = new NetworkStream(clientSocket))
+            PacketEvents.Add(new PacketEvent
             {
-                s.Read(data, 0, data.Length);
-                var memory = new MemoryStream(data);
-                memory.Position = 0;
-
-                var formatter = new BinaryFormatter();
-                var obj = formatter.Deserialize(memory);
-
-                return obj;
-            }
-        }
-
-        private PacketEvents BuildEvent(SimpleClient sender, SimpleClient receiver, object package)
-        {
-            return new PacketEvents
-            {
-                Sender = sender,
-                Receiver = receiver,
+                Name = name,
+                Sender = sender.ClientId,
+                Receiver = receiver?.ClientId,
                 Packet = package
-            };
+            });
         }
 
-        private PersonalPacketEvents BuildEvent(SimpleClient sender, SimpleClient receiver, PersonalPacket package)
-        {
-            return new PersonalPacketEvents
-            {
-                Sender = sender,
-                Receiver = receiver,
-                Packet = package
-            };
-        }
     }
 }

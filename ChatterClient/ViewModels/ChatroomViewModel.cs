@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using SimpleTcp;
 
 namespace ChatterClient
 {
@@ -33,7 +34,7 @@ namespace ChatterClient
 
         private SimpleClient _client;
 
-        private Task<bool> _listenTask;
+        private Task<Guid?> _listenTask;
         private Task _updateTask;
         private Task _connectionTask;
 
@@ -65,7 +66,7 @@ namespace ChatterClient
             if (IsRunning)
             {
                 _updateTask = Task.Run(() => Update());
-                await _client.SendObject(connectionPacket);
+                await _client.Socket.SendObject(connectionPacket);
                 _connectionTask = Task.Run(() => MonitorConnection());
                 Status = "Connected";
             }
@@ -78,9 +79,9 @@ namespace ChatterClient
 
         private async Task<PersonalPacket> GetNewConnectionPacket(string username)
         {
-            _listenTask = Task.Run(() => _client.Connect());
+            _listenTask = _client.Socket.ConnectTo(_client.EndPoint);
 
-            IsRunning = await _listenTask;
+            IsRunning = (await _listenTask).HasValue;
 
             var notifyServer = new UserConnectionPacket
             {
@@ -112,7 +113,7 @@ namespace ChatterClient
                 await _connectionTask;
                 await _updateTask;
 
-                _client.Disconnect();
+                _client.Socket.Disconnect();
             }
 
             Status = "Disconnected";
@@ -137,7 +138,7 @@ namespace ChatterClient
                 UserColor = colorCode
             };
 
-            await _client.SendObject(cap);
+            await _client.Socket.SendObject(cap);
         }
 
         private async Task Update()
@@ -165,7 +166,7 @@ namespace ChatterClient
                 {
                     if (!_pinged)
                     {
-                        var result = await _client.PingConnection();
+                        var result = await _client.Socket.PingConnection();
                         _pinged = true;
 
                         Thread.Sleep(5000);
@@ -183,7 +184,7 @@ namespace ChatterClient
 
         private async Task<bool> MonitorData()
         {
-            var newObject = await _client.RecieveObject();
+            var newObject = await _client.Socket.ReceiveObject();
             if (newObject == null)
                 return false;
             App.Current.Dispatcher.Invoke(delegate

@@ -20,7 +20,7 @@ namespace ChatterServer.Services
         private Task _updateTask;
         private Task _listenTask;
 
-        void onNext(IChange change) => Model.Instance.AddChange(change);
+        void onNext<T>(T change) where T : IChange => Model.Instance.AddChange(change);
 
         public Service()
         {
@@ -44,7 +44,6 @@ namespace ChatterServer.Services
             };
         }
 
-
         private async Task Run()
         {
             onNext(new StatusChange("Connecting..."));
@@ -61,21 +60,44 @@ namespace ChatterServer.Services
 
             if (!int.TryParse(Model.Instance.String<PortChange>(), out var socketPort))
             {
-                DisplayError("Port value is not valid.");
+                DisplayError("Port value is not valid!");
                 return;
             }
 
             onNext(new StatusChange("Obtaining IP..."));
-            await Task.Run(() => GetExternalIp());
+            await Task.Run(() => onNext(new ExternalAddressChange(IPHelper.InternalIp())));
             onNext(new StatusChange("Setting up server..."));
             _server = new SimpleServer(IPAddress.Any, socketPort);
             onNext(new StatusChange("Setting up events..."));
-            _server.OnConnectionAccepted += Server_OnConnectionAccepted;
-            _server.OnConnectionRemoved += Server_OnConnectionRemoved;
-            _server.OnPacketSent += Server_OnPacketSent;
-            _server.OnPersonalPacketSent += Server_OnPersonalPacketSent;
-            _server.OnPersonalPacketReceived += Server_OnPersonalPacketReceived;
-            _server.OnPacketReceived += Server_OnPacketReceived;
+
+            _server.PacketEvents.CollectionChanged += (s, e) =>
+            {
+                foreach (PacketEvent item in e.NewItems)
+                {
+                    switch (item.Name)
+                    {
+                        case SimpleServer.OnConnectionAccepted:
+                            Server_OnConnectionAccepted(item.Sender, item);
+                            break;
+                        case SimpleServer.OnConnectionRemoved:
+                            Server_OnConnectionRemoved(item.Sender, item);
+                            break;
+                        case SimpleServer.OnPacketReceived:
+                            Server_OnPacketReceived(item.Sender, item);
+                            break;
+                        case SimpleServer.OnPersonalPacketReceived:
+                            Server_OnPersonalPacketReceived(item.Sender, new PersonalPacketEvents { Packet = (PersonalPacket)item.Packet, Sender = item.Sender });
+                            break;
+                        case SimpleServer.OnPersonalPacketSent:
+                            Server_OnPersonalPacketSent(item.Sender, new PersonalPacketEvents { Packet = (PersonalPacket)item.Packet, Sender = item.Sender });
+                            break;
+                        case SimpleServer.OnPacketSent:
+                            Server_OnPacketSent(item.Sender, item);
+                            break;
+                    }
+                    onNext(new OutputChange(item.Name));
+                }
+            };
         }
 
         private void Update()
@@ -106,35 +128,19 @@ namespace ChatterServer.Services
             onNext(new StatusChange("Stopped"));
         }
 
-        private void GetExternalIp()
-        {
-            try
-            {
-                string externalIP;
-                //externalIP = (new WebClient()).DownloadString("http://checkip.dyndns.org/");
-                //externalIP = (new Regex(@"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"))
-                //             .Matches(externalIP)[0].ToString();
-                externalIP = "127.0.0.1";
-                //ExternalAddress = externalIP;
-                onNext(new ExternalAddressChange(externalIP));
-            }
-            catch
-            {
-                onNext(new ExternalAddressChange("Error receiving IP address."));
-            }
-        }
+
 
         private void DisplayError(string message)
         {
             MessageBox.Show(message, "Woah there!", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
-        private void Server_OnPacketSent(object sender, PacketEvents e)
+        private void Server_OnPacketSent(object sender, PacketEvent e)
         {
 
         }
 
-        private void Server_OnPacketReceived(object sender, PacketEvents e)
+        private void Server_OnPacketReceived(object sender, PacketEvent e)
         {
 
         }
@@ -152,7 +158,7 @@ namespace ChatterServer.Services
                 Task.Run(() => _server.SendObjectToClients(new ChatPacket
                 {
                     Username = "Server",
-                    Message = "A new user has joined the chat",
+                    Message = $"A new user, {ucp.Username}, has joined the chat",
                     UserColor = Colors.Purple.ToString(),
 
                 })).Wait();
@@ -177,26 +183,28 @@ namespace ChatterServer.Services
             }
         }
 
-        private void Server_OnConnectionAccepted(object sender, PacketEvents e)
+        private void Server_OnConnectionAccepted(object sender, PacketEvent e)
         {
-            WriteOutput("Client Connected: " + e.Sender.Socket.RemoteEndPoint.ToString());
+            //WriteOutput("Client Connected: " + e.Sender.Socket.RemoteEndPoint.ToString());
         }
 
-        private void Server_OnConnectionRemoved(object sender, PacketEvents e)
+        private void Server_OnConnectionRemoved(object sender, PacketEvent e)
         {
             Dictionary<string, string> Usernames = Model.Instance.Dictionary<UserNameAddChange>();
-            if (!Usernames.ContainsKey(e.Sender.ClientId.ToString()))
+            if (!Usernames.ContainsKey(sender.ToString()))
                 return;
+
+            var userName = Usernames[sender.ToString()];
 
             var notification = new ChatPacket
             {
                 Username = "Server",
-                Message = "A user has left the chat",
+                Message = $"{userName} has left the chat",
                 UserColor = Colors.Purple.ToString()
             };
 
-            var userGuid = e.Sender.ClientId.ToString();
-            var userName = Usernames[e.Sender.ClientId.ToString()];
+            var userGuid = sender.ToString();
+
             if (Usernames.Keys.Contains(userGuid))
                 Usernames.Remove(userGuid);
 
@@ -213,7 +221,7 @@ namespace ChatterServer.Services
                 Task.Run(() => _server.SendObjectToClients(userPacket)).Wait();
                 Task.Run(() => _server.SendObjectToClients(notification)).Wait();
             }
-            WriteOutput("Client Disconnected: " + e.Sender.Socket.RemoteEndPoint.ToString());
+            //WriteOutput("Client Disconnected: " + e.Sender.Socket.RemoteEndPoint.ToString());
         }
 
         private void WriteOutput(string message)
